@@ -1,7 +1,9 @@
 # waybar_wireplumber_audio_changer
-A script that uses fuzzel and wpctl to change audio sinks. Can be used with waybar to make a clickable audio sink changer
+A script that uses fuzzel or wofi and wpctl to change audio sinks and sources. Can be used with waybar to make a clickable audio changer
 
-Needs to have fuzzel installed, as well as wireplumber in order to use the wpctl command.
+Dependencies:
+wireplumber - for wpctl
+fuzzel or wofi - for menu
 
 ![Example Screenshot](example.png)
 
