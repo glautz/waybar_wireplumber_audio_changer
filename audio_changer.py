@@ -1,60 +1,74 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 import subprocess
 
-# function to parse output of command "wpctl status" and return a dictionary of sinks with their id and name.
-def parse_wpctl_status():
-    # Execute the wpctl status command and store the output in a variable.
-    output = str(subprocess.check_output("wpctl status", shell=True, encoding='utf-8'))
+# Choose menu program: "fuzzel" or "wofi"
+MENU = "fuzzel"
 
-    # remove the ascii tree characters and return a list of lines
+def parse_wpctl_status():
+    output = str(subprocess.check_output("wpctl status", shell=True, encoding='utf-8'))
     lines = output.replace("├", "").replace("─", "").replace("│", "").replace("└", "").splitlines()
 
-    # get the index of the Sinks line as a starting point
-    sinks_index = None
-    for index, line in enumerate(lines):
-        if "Sinks:" in line:
-            sinks_index = index
-            break
-
-    # start by getting the lines after "Sinks:" and before the next blank line and store them in a list
+    # --- Sinks ---
+    sinks_index = next((i for i, line in enumerate(lines) if "Sinks:" in line), None)
     sinks = []
-    for line in lines[sinks_index +1:]:
+    for line in lines[sinks_index + 1:]:
         if not line.strip():
             break
         sinks.append(line.strip())
+    sinks = [s.split("[vol:")[0].strip() for s in sinks]
+    sinks = [s.replace("*", "").strip() + " - Default" if s.startswith("*") else s for s in sinks]
+    sinks_dict = [{"id": int(s.split(".")[0]), "name": s.split(".")[1].strip(), "type": "sink"} for s in sinks]
 
-    # remove the "[vol:" from the end of the sink name
-    for index, sink in enumerate(sinks):
-        sinks[index] = sink.split("[vol:")[0].strip()
-    
-    # strip the * from the default sink and instead append "- Default" to the end. Looks neater in the wofi list this way.
-    for index, sink in enumerate(sinks):
-        if sink.startswith("*"):
-            sinks[index] = sink.strip().replace("*", "").strip() + " - Default"
+    # --- Sources ---
+    sources_index = next((i for i, line in enumerate(lines) if "Sources:" in line), None)
+    sources = []
+    for line in lines[sources_index + 1:]:
+        if not line.strip():
+            break
+        sources.append(line.strip())
+    sources = [s.split("[vol:")[0].strip() for s in sources]
+    sources = [s.replace("*", "").strip() + " - Default" if s.startswith("*") else s for s in sources]
+    sources_dict = [{"id": int(s.split(".")[0]), "name": s.split(".")[1].strip(), "type": "source"} for s in sources]
 
-    # make the dictionary in this format {'sink_id': <int>, 'sink_name': <str>}
-    sinks_dict = [{"sink_id": int(sink.split(".")[0]), "sink_name": sink.split(".")[1].strip()} for sink in sinks]
+    return sinks_dict, sources_dict
 
-    return sinks_dict
-
-# get the list of sinks ready to put into Fuzzel - highlight the current default sink
+# Build menu output
+sinks, sources = parse_wpctl_status()
 output = ''
-sinks = parse_wpctl_status()
-for items in sinks:
-    if items['sink_name'].endswith(" - Default"):
-        output += f"-> {items['sink_name']}\n"
+output += "─── Sinks: ───\n"
+for item in sinks:
+    if item['name'].endswith(" - Default"):
+        output += f" {item['name']}\n"
     else:
-        output += f"{items['sink_name']}\n"
+        output += f"{item['name']}\n"
 
-# Call Fuzzel and show the list. take the selected sink name and set it as the default sink
-fuzzel_command = f"echo '{output}' | fuzzel --dmenu --anchor top-right --x-margin=10 --y-margin=10 --width=40 --lines=4 --hide-prompt"
-fuzzel_process = subprocess.run(fuzzel_command, shell=True, encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+output += "─────────────────────────────────────────\n"
+output += "─── Sources: ───\n"
+for item in sources:
+    if item['name'].endswith(" - Default"):
+        output += f" {item['name']}\n"
+    else:
+        output += f"{item['name']}\n"
 
-if fuzzel_process.returncode != 0:
+# Build the menu command depending on MENU choice
+if MENU == "fuzzel":
+    menu_command = f"echo '{output}' | fuzzel --dmenu --anchor top-right --x-margin=10 --y-margin=10 --width=40 --lines=10 --hide-prompt"
+elif MENU == "wofi":
+    # wofi uses slightly different flags, but --dmenu works the same
+    menu_command = f"echo '{output}' | wofi --show=dmenu --no-sort --hide-scroll --allow-markup --define=hide_search=true --location=top_right --width=600 --height=400 --xoffset=-40 --yoffset=10"
+
+# Run menu
+menu_process = subprocess.run(menu_command, shell=True, encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+if menu_process.returncode != 0:
     print("User cancelled the operation.")
     exit(0)
 
-selected_sink_name = fuzzel_process.stdout.strip()
-sinks = parse_wpctl_status()
-selected_sink = next(sink for sink in sinks if sink['sink_name'] == selected_sink_name)
-subprocess.run(f"wpctl set-default {selected_sink['sink_id']}", shell=True)
+selected_name = menu_process.stdout.strip().replace("-> ", "").strip()
+
+# Find selected item in sinks or sources
+all_items = sinks + sources
+selected_item = next(item for item in all_items if item['name'] == selected_name)
+
+# Set default depending on type
+subprocess.run(f"wpctl set-default {selected_item['id']}", shell=True)
