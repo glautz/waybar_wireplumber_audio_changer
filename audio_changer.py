@@ -37,24 +37,24 @@ def parse_wpctl_status():
 
     return sinks_dict
 
-# get the list of sinks ready to put into wofi - highlight the current default sink
+# get the list of sinks ready to put into Fuzzel - highlight the current default sink
 output = ''
 sinks = parse_wpctl_status()
 for items in sinks:
     if items['sink_name'].endswith(" - Default"):
-        output += f"<b>-> {items['sink_name']}</b>\n"
+        output += f"-> {items['sink_name']}\n"
     else:
         output += f"{items['sink_name']}\n"
 
-# Call wofi and show the list. take the selected sink name and set it as the default sink
-wofi_command = f"echo '{output}' | wofi --show=dmenu --hide-scroll --allow-markup --define=hide_search=true --location=top_right --width=600 --height=200 --xoffset=-60"
-wofi_process = subprocess.run(wofi_command, shell=True, encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+# Call Fuzzel and show the list. take the selected sink name and set it as the default sink
+fuzzel_command = f"echo '{output}' | fuzzel --dmenu --anchor top-right --x-margin=10 --y-margin=10 --width=40 --lines=4 --hide-prompt"
+fuzzel_process = subprocess.run(fuzzel_command, shell=True, encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-if wofi_process.returncode != 0:
+if fuzzel_process.returncode != 0:
     print("User cancelled the operation.")
     exit(0)
 
-selected_sink_name = wofi_process.stdout.strip()
+selected_sink_name = fuzzel_process.stdout.strip()
 sinks = parse_wpctl_status()
 selected_sink = next(sink for sink in sinks if sink['sink_name'] == selected_sink_name)
 subprocess.run(f"wpctl set-default {selected_sink['sink_id']}", shell=True)
