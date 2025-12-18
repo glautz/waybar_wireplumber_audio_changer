@@ -4,6 +4,7 @@ A script that uses fuzzel or wofi and wpctl to change audio sinks and sources. C
 Dependencies:  
 wireplumber - for wpctl  
 fuzzel or wofi - for menu  
+font for icons - example: nerd-fonts
 
 ![Example Screenshot](example.png)
 
